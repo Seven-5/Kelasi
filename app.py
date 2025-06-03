@@ -72,6 +72,7 @@ def get_notifications_by_code_ecole(code_ecole: str):
 def create_table():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ecole (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,17 +82,21 @@ def create_table():
             mdp_ecole TEXT,
             login_admin TEXT UNIQUE,
             mdp_admin TEXT
-        );
+        )
+    ''')
+
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code_ecole TEXT NOT NULL,
             message TEXT NOT NULL,
             date_envoi TEXT NOT NULL
-        );
+        )
     ''')
 
     conn.commit()
     conn.close()
+
 
 create_table()
 
