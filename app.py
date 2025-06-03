@@ -25,15 +25,48 @@ os.makedirs(DOSSIER_JSON, exist_ok=True)
 SECRET_KEY = "mrfrijoseven5officemanager"
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
+
 # --- Modèle Pydantic pour valider l'entrée ---
+
 class EcoleRequest(BaseModel):
     nom_ecole: str
     code_ecole: str
-    telephone: str
     mdp_ecole: str
+    telephone: str
     login_admin: str
     mdp_admin: str
    
+
+class UpdateAdminRequest(BaseModel):
+    login: str
+    ancien_mdp: str
+    nouveau_login: str = None
+    nouveau_mdp1: str = None
+    nouveau_mdp2: str = None
+
+
+class NotificationRequest(BaseModel):
+    login_admin: str
+    mdp_admin: str
+    message: str
+
+    
+# --- Les fonctions utilis ---
+def get_notifications_by_code_ecole(code_ecole: str):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT message, date_envoi FROM notifications WHERE code_ecole = ? ORDER BY date_envoi DESC", (code_ecole,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [{"message": row["message"], "date": row["date_envoi"]} for row in rows]
+
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"Erreur DB: {e}")
+
 
 # --- Création de la table si elle n'existe pas ---
 def create_table():
@@ -42,14 +75,21 @@ def create_table():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ecole (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom_ecole TEXT,
+            nom_ecole TEXT UNIQUE,
             code_ecole TEXT,
             telephone TEXT,
             mdp_ecole TEXT,
-            login_admin TEXT,
+            login_admin TEXT UNIQUE,
             mdp_admin TEXT
-        )
+        );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code_ecole TEXT NOT NULL,
+            message TEXT NOT NULL,
+            date_envoi TEXT NOT NULL
+        );
     ''')
+
     conn.commit()
     conn.close()
 
@@ -64,6 +104,8 @@ def create_token(data: dict, expires_days: int = TOKEN_EXPIRE_DAYS):
     return token
 
 # --- Endpoint sécurisé ---
+
+
 @app.post("/inscription_ecole")
 async def inscription_ecole(req: EcoleRequest):
     conn = sqlite3.connect(DB_PATH)
@@ -155,8 +197,8 @@ async def recevoir_donnees(request: Request):
         nom_fichier = os.path.join(DOSSIER_JSON, f"{code_ecole}.json")
         with open(nom_fichier, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-
-        return {"message": f"✅ Données enregistrées pour avec succès"}
+        notifications = get_notifications_by_code_ecole(code_ecole)
+        return {"message": f"✅ Données enregistrées pour avec succès", "notification": notifications}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur: {e}")
@@ -217,3 +259,116 @@ async def envoyer_donnees(request: Request):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur: {e}")
+
+# Code secret (à garder confidentiel)
+ADMIN_SECRET_CODE = "seven5-admin-2024"
+
+@app.post("/liste_ecoles")
+async def liste_ecoles(request: Request):
+    body = await request.json()
+    code = body.get("code")
+
+    if not code or code != ADMIN_SECRET_CODE:
+        raise HTTPException(status_code=403, detail="⛔ Code d'accès invalide.")
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT nom_ecole, code_ecole, telephone, login_admin FROM ecole")
+        rows = cursor.fetchall()
+        conn.close()
+
+        ecoles = [dict(row) for row in rows]
+
+        return {
+            "message": "✅ Liste des écoles récupérée avec succès",
+            "ecoles": ecoles
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur serveur : {e}")
+
+@app.post("/modifier_admin")
+async def modifier_admin(data: UpdateAdminRequest):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Récupération de l'admin
+        cursor.execute("SELECT * FROM ecole WHERE login_admin = ?", (data.login,))
+        admin = cursor.fetchone()
+
+        if not admin:
+            raise HTTPException(status_code=404, detail="❌ Admin introuvable.")
+
+        # Vérification de l'ancien mot de passe
+        if not bcrypt.checkpw(data.ancien_mdp.encode(), admin["mdp_admin"].encode()):
+            raise HTTPException(status_code=401, detail="❌ Ancien mot de passe incorrect.")
+
+        # Préparer les modifications
+        updates = []
+        values = []
+
+        if data.nouveau_login and data.nouveau_login != admin["login_admin"]:
+            # Vérifier que le nouveau login n'est pas déjà utilisé
+            cursor.execute("SELECT * FROM ecole WHERE login_admin = ?", (data.nouveau_login,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="❌ Ce login est déjà pris.")
+            updates.append("login_admin = ?")
+            values.append(data.nouveau_login)
+
+        if data.nouveau_mdp1:
+            if data.nouveau_mdp1 != data.nouveau_mdp2:
+                raise HTTPException(status_code=400, detail="❌ Les nouveaux mots de passe ne correspondent pas.")
+            hashed_new = bcrypt.hashpw(data.nouveau_mdp1.encode(), bcrypt.gensalt()).decode()
+            updates.append("mdp_admin = ?")
+            values.append(hashed_new)
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="❌ Aucun changement détecté.")
+
+        # Exécuter la mise à jour
+        values.append(data.login)
+        query = f"UPDATE ecole SET {', '.join(updates)} WHERE login_admin = ?"
+        cursor.execute(query, values)
+        conn.commit()
+        conn.close()
+
+        return {"message": "✅ Informations de l'admin mises à jour avec succès."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur serveur : {e}")
+
+
+@app.post("/notifier_ecole")
+async def notifier_ecole(data: NotificationRequest):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # Authentifier l'admin
+        cursor.execute("SELECT * FROM ecole WHERE login_admin = ?", (data.login_admin,))
+        admin = cursor.fetchone()
+
+        if not admin:
+            raise HTTPException(status_code=404, detail="❌ Admin introuvable.")
+
+        if not bcrypt.checkpw(data.mdp_admin.encode(), admin["mdp_admin"].encode()):
+            raise HTTPException(status_code=401, detail="❌ Mot de passe incorrect.")
+
+        # Insérer la notification
+        now = datetime.now().isoformat()
+        cursor.execute(
+            "INSERT INTO notifications (code_ecole, message, date_envoi) VALUES (?, ?, ?)",
+            (admin["code_ecole"], data.message, now)
+        )
+        conn.commit()
+        conn.close()
+
+        return {"message": "✅ Notification envoyée avec succès."}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur serveur : {e}")
