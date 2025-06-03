@@ -28,6 +28,27 @@ SECRET_KEY = "mrfrijoseven5officemanager"
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_DAYS = 30
 
+# --- hles models pour les endpoints ---
+class EcoleRequest(BaseModel):
+    nom_ecole: str
+    code_ecole: str
+    mdp_ecole: str
+    telephone: str
+    login_admin: str
+    mdp_admin: str
+
+class UpdateAdminRequest(BaseModel):
+    login: str
+    ancien_mdp: str
+    nouveau_login: str = None
+    nouveau_mdp1: str = None
+    nouveau_mdp2: str = None
+
+class NotificationRequest(BaseModel):
+    login_admin: str
+    mdp_admin: str
+    message: str
+
 # --- helper pour récupérer la session DB ---
 def get_db():
     db = SessionLocal()
