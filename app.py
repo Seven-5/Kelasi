@@ -105,6 +105,12 @@ def create_token(data: dict, expires_days: int = TOKEN_EXPIRE_DAYS):
 
 # --- Endpoint sécurisé ---
 
+@app.get("/test")
+async def teste():
+    return {
+        "message": "✅ L'API fonctionne parfaitement",
+        "status": "OK"
+    }
 
 @app.post("/inscription_ecole")
 async def inscription_ecole(req: EcoleRequest):
