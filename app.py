@@ -12,15 +12,15 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ou liste précise ["http://localhost:5500"] par ex.
+    allow_origins=["*"],  # ou liste précise 
     allow_credentials=True,
     allow_methods=["*"],   # autorise GET, POST, OPTIONS etc
     allow_headers=["*"],
 )
 
 # --- Configuration ---
-DB_PATH = "ma_base.db"
-DOSSIER_JSON = "ecoles_json"
+DB_PATH = "/tmp/ma_base.db"
+DOSSIER_JSON = "/tmp/ecoles_json"
 os.makedirs(DOSSIER_JSON, exist_ok=True)
 SECRET_KEY = "mrfrijoseven5officemanager"
 ALGORITHM = "HS256"
@@ -164,7 +164,7 @@ async def recevoir_donnees(request: Request):
 
 
 @app.post("/get_data")
-async def recevoir_donnees(request: Request):
+async def envoyer_donnees(request: Request):
     try:
         data = await request.json()
 
