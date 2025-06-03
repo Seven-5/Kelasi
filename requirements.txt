@@ -1,5 +1,7 @@
 fastapi
 uvicorn
 bcrypt
+sqlalchemy
+psycopg2-binary
 python-jose[cryptography]
 jwt
