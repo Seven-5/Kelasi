@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import RedirectResponse
+
 from pydantic import BaseModel
 import bcrypt
 import json
