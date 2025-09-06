@@ -581,7 +581,6 @@ async def notifier_ecole(data: NotificationRequest, db: Session = Depends(get_db
         raise HTTPException(status_code=500, detail=f"Erreur serveur : {e}")
 
 from fastapi import FastAPI, Query
-import requests
 
 
 # URL du fichier JSON dans ton repo GitHub
@@ -594,7 +593,7 @@ def check_update(version: str = Query(..., description="Version actuelle du logi
     Si la version envoyée < latest_version, renvoie le lien de téléchargement.
     """
     try:
-        r = requests.get(UPDATE_JSON_URL)
+        r = Requests.get(UPDATE_JSON_URL)
         r.raise_for_status()
         update_info = r.json()
     except Exception as e:
