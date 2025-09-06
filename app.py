@@ -580,5 +580,42 @@ async def notifier_ecole(data: NotificationRequest, db: Session = Depends(get_db
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur serveur : {e}")
 
+from fastapi import FastAPI, Query
+import requests
 
+
+# URL du fichier JSON dans ton repo GitHub
+UPDATE_JSON_URL = "https://raw.githubusercontent.com/Seven-5/Kelasi/main/update.json"
+
+@app.get("/check-update")
+def check_update(version: str = Query(..., description="Version actuelle du logiciel")):
+    """
+    Vérifie si le logiciel doit se mettre à jour.
+    Si la version envoyée < latest_version, renvoie le lien de téléchargement.
+    """
+    try:
+        r = requests.get(UPDATE_JSON_URL)
+        r.raise_for_status()
+        update_info = r.json()
+    except Exception as e:
+        return {"error": f"Impossible de récupérer les infos de mise à jour: {str(e)}"}
+
+    latest_version = update_info.get("latest_version", "")
+    download_url = update_info.get("download_url", "")
+
+    # Comparaison simple des versions
+    if version < latest_version:
+        return {
+            "update": True,
+            "latest_version": latest_version,
+            "changelog": update_info.get("changelog", []),
+            "download_url": download_url
+        }
+    else:
+        return {
+            "update": False,
+            "latest_version": latest_version
+        }
+
+# — Fin des endpoints adaptés —
 # — Fin des endpoints adaptés —
