@@ -1,0 +1,11 @@
+{
+  "latest_version": "2.0.1",
+  "release_date": "2025-09-06",
+  "changelog": [
+    "Ajout de la gestion des dépenses avec choix du revenu source",
+    "Optimisation de l'affichage des horaires",
+    "Correction de bugs mineurs dans le bulletin provisoire",
+    "Amélioration des notifications pour les parent"
+  ],
+  "download_url": "https://github.com/Seven-5/Kelasi/releases/updated.zip"
+}
